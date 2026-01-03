@@ -1,4 +1,4 @@
-# odcread (Go Port)
+# go-odc-reader (Go port of odcreader)
 
 A lightweight Go utility for extracting plain text from Oberon/F compound documents (`.odc` files).
 
