@@ -2,6 +2,6 @@
 
 *.opt
 /_tests/
-!/_tests/*.odc.txt
-/src/odcread
+/out/
+/bin/odcread
 /src-cpp/
