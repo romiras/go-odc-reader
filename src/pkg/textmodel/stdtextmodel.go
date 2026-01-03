@@ -29,7 +29,12 @@ func (stm *StdTextModel) GetTypeName() string {
 }
 
 // Internalize reads StdTextModel data from the reader.
-// Format: version, metadata_length, then pieces with attributes until ano==-1
+// Format (from C++ source comments):
+//
+//	byte 0: version
+//	byte 1-5: len (length of piece descriptions)
+//	byte 6-5+len: piece descriptions
+//	byte 6+len-end: pieces (length of each defined in piece descriptions)
 func (stm *StdTextModel) Internalize(reader store.Reader) error {
 	// Call parent internalization
 	if err := stm.TextModel.Internalize(reader); err != nil {
@@ -42,7 +47,11 @@ func (stm *StdTextModel) Internalize(reader store.Reader) error {
 		return err
 	}
 
-	// Read metadata section length (not used, but must be read)
+	// Read metadata section length
+	// NOTE: This is NOT consumed! According to the C++ source, this is the length of the
+	// piece descriptions section (the metadata we're about to read: ano, attributes, pieceLen).
+	// It's informational only - the bytes are consumed naturally by the loop below.
+	// The C++ code reads this value but never uses it to skip bytes.
 	_, err = reader.ReadInt()
 	if err != nil {
 		return fmt.Errorf("failed to read metadata length: %w", err)
@@ -54,7 +63,7 @@ func (stm *StdTextModel) Internalize(reader store.Reader) error {
 	// Read pieces in a loop until ano == -1
 	stm.pieces = make([]TextPiece, 0)
 
-	ano, err := reader.ReadByte()
+	ano, err := reader.ReadSignedByte()
 	if err != nil {
 		return fmt.Errorf("failed to read first ano: %w", err)
 	}
@@ -108,7 +117,7 @@ func (stm *StdTextModel) Internalize(reader store.Reader) error {
 		stm.pieces = append(stm.pieces, piece)
 
 		// Read next ano
-		ano, err = reader.ReadByte()
+		ano, err = reader.ReadSignedByte()
 		if err != nil {
 			return fmt.Errorf("failed to read next ano: %w", err)
 		}

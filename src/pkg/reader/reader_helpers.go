@@ -149,9 +149,11 @@ func (r *Reader) internalizeAlien(alienStore *alien.Alien, down, end int64) erro
 			if err != nil {
 				return fmt.Errorf("failed to read store in alien: %w", err)
 			}
-
 			part := alien.NewAlienPart(st)
 			alienStore.AddComponent(part)
+
+			// Get current position after reading the store
+			_, _ = r.rider.Seek(0, io.SeekCurrent)
 
 			// Update next position
 			if r.state.Next > 0 {

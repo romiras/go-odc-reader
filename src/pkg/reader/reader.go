@@ -68,8 +68,15 @@ func (r *Reader) ReadLChar() (oberon.Char, error) {
 	return ch, err
 }
 
-// ReadByte reads a single signed byte.
-func (r *Reader) ReadByte() (oberon.Byte, error) {
+// ReadByte reads a single unsigned byte (implements io.ByteReader).
+func (r *Reader) ReadByte() (byte, error) {
+	var b byte
+	err := binary.Read(r.rider, binary.LittleEndian, &b)
+	return b, err
+}
+
+// ReadSignedByte reads a single signed byte.
+func (r *Reader) ReadSignedByte() (oberon.Byte, error) {
 	var b oberon.Byte
 	err := binary.Read(r.rider, binary.LittleEndian, &b)
 	return b, err
@@ -108,7 +115,7 @@ func (r *Reader) ReadSString() (string, error) {
 // ReadVersion reads and validates a version byte.
 // If the version is not in [min, max], the current store is turned into an alien.
 func (r *Reader) ReadVersion(min, max oberon.Integer) (oberon.Integer, error) {
-	versionByte, err := r.ReadByte()
+	versionByte, err := r.ReadSignedByte()
 	if err != nil {
 		return 0, err
 	}
@@ -138,11 +145,11 @@ func (r *Reader) TurnIntoAlien(cause int) error {
 
 // ReadStore reads a store from the binary stream.
 func (r *Reader) ReadStore() (store.Store, error) {
-	return r.readStoreOrElemStore(false)
+	return r.readStoreOrElemStore()
 }
 
 // readStoreOrElemStore reads either a Store or Elem-type store.
-func (r *Reader) readStoreOrElemStore(isElem bool) (store.Store, error) {
+func (r *Reader) readStoreOrElemStore() (store.Store, error) {
 	// Read the store marker
 	marker, err := r.ReadSChar()
 	if err != nil {
@@ -350,11 +357,15 @@ func (r *Reader) readNewStore(isElem bool) (store.Store, error) {
 		r.storeList = append(r.storeList, alienStore)
 	}
 
+	// Save the store's end position BEFORE swapping states
+	// This is critical for nested aliens - we need the actual end position, not the empty state's End
+	storeEnd := r.state.End
+
 	// Save state and internalize the alien
 	saveState := r.state
 	r.state = &ReaderState{}
 
-	err = r.internalizeAlien(alienStore, downPos, saveState.End)
+	err = r.internalizeAlien(alienStore, downPos, storeEnd)
 	if err != nil {
 		r.state = saveState
 		return nil, fmt.Errorf("failed to internalize alien: %w", err)
@@ -362,10 +373,10 @@ func (r *Reader) readNewStore(isElem bool) (store.Store, error) {
 
 	r.state = saveState
 
-	// Verify position after alien internalization
+	// Verify position after alien internalization using the SAVED end position
 	currentPos, _ := r.rider.Seek(0, io.SeekCurrent)
-	if currentPos != r.state.End {
-		return nil, fmt.Errorf("position mismatch after alien: expected %d, got %d", r.state.End, currentPos)
+	if currentPos != storeEnd {
+		return nil, fmt.Errorf("position mismatch after alien: expected %d, got %d", storeEnd, currentPos)
 	}
 
 	// Reset state after reading alien
