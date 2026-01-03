@@ -1,0 +1,7 @@
+.vscode/
+
+*.opt
+/_tests/
+!/_tests/*.odc.txt
+/src/odcread
+/src-cpp/
