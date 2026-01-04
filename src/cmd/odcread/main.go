@@ -69,11 +69,13 @@ func (fc *FoldContext) GetPlainText() string {
 // MyVisitor - concrete visitor implementation for text extraction
 type MyVisitor struct {
 	contextStack []Context
+	visited      map[store.Store]bool // Track visited stores by pointer to prevent cycles
 }
 
 func NewMyVisitor() *MyVisitor {
 	return &MyVisitor{
 		contextStack: make([]Context, 0),
+		visited:      make(map[store.Store]bool),
 	}
 }
 
@@ -135,6 +137,14 @@ func (mv *MyVisitor) TextLongPiece(piece interface{}) {
 			mv.contextStack[len(mv.contextStack)-1].AddPiece(str)
 		}
 	}
+}
+
+func (mv *MyVisitor) ShouldVisit(s store.Store) bool {
+	if mv.visited[s] {
+		return false
+	}
+	mv.visited[s] = true
+	return true
 }
 
 // importDocument reads and validates an .odc document.

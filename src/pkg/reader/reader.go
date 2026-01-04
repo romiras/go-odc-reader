@@ -202,10 +202,35 @@ func (r *Reader) readNilStore() (store.Store, error) {
 
 // readLinkStore reads a link to an Elem-type store.
 func (r *Reader) readLinkStore() (store.Store, error) {
-	// Read the link ID
+	// LINK stores have full headers: id, comment, next (12 bytes total)
+	// From Component Pascal: rd.ReadInt(id); rd.ReadInt(comment); rd.ReadInt(next);
 	id, err := r.ReadInt()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read link ID: %w", err)
+	}
+
+	comment, err := r.ReadInt()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read comment: %w", err)
+	}
+
+	next, err := r.ReadInt()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read next: %w", err)
+	}
+
+	// Update state tracking (same logic as NIL stores)
+	currentPos, err := r.rider.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get position: %w", err)
+	}
+	r.state.End = currentPos
+
+	// Calculate next pointer
+	if next > 0 || (next == 0 && comment%2 == 1) {
+		r.state.Next = r.state.End + int64(next)
+	} else {
+		r.state.Next = 0
 	}
 
 	// Look up in elem list
@@ -218,10 +243,35 @@ func (r *Reader) readLinkStore() (store.Store, error) {
 
 // readNewLinkStore reads a link to a non-Elem-type store.
 func (r *Reader) readNewLinkStore() (store.Store, error) {
-	// Read the link ID
+	// NEWLINK stores have full headers: id, comment, next (12 bytes total)
+	// From Component Pascal: rd.ReadInt(id); rd.ReadInt(comment); rd.ReadInt(next);
 	id, err := r.ReadInt()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read new link ID: %w", err)
+	}
+
+	comment, err := r.ReadInt()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read comment: %w", err)
+	}
+
+	next, err := r.ReadInt()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read next: %w", err)
+	}
+
+	// Update state tracking (same logic as NIL stores)
+	currentPos, err := r.rider.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get position: %w", err)
+	}
+	r.state.End = currentPos
+
+	// Calculate next pointer
+	if next > 0 || (next == 0 && comment%2 == 1) {
+		r.state.Next = r.state.End + int64(next)
+	} else {
+		r.state.Next = 0
 	}
 
 	// Look up in store list

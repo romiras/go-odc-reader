@@ -76,6 +76,8 @@ type Visitor interface {
 	PartEnd()
 	FoldLeft(collapsed bool)
 	FoldRight()
+	// ShouldVisit checks if a store should be visited (returns false if already visited)
+	ShouldVisit(s Store) bool
 }
 
 // BaseStore provides common functionality for all Store implementations.

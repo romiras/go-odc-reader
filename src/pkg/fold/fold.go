@@ -115,6 +115,11 @@ func (f *Fold) String() string {
 
 // Accept implements the visitor pattern for Fold.
 func (f *Fold) Accept(visitor store.Visitor) {
+	// Check if this fold has already been visited (prevents cycles from LINK/NEWLINK)
+	if !visitor.ShouldVisit(f) {
+		return
+	}
+
 	visitor.FoldLeft(f.collapsed)
 
 	// Visit the hidden part

@@ -109,8 +109,13 @@ func (a *Alien) String() string {
 		a.GetID(), a.path.String(), len(a.comps))
 }
 
-// Accept implements the visitor pattern by visiting all components.
+// Accept implements the visitor pattern for Alien.
 func (a *Alien) Accept(visitor store.Visitor) {
+	// Check if this alien has already been visited (prevents cycles from LINK/NEWLINK)
+	if !visitor.ShouldVisit(a) {
+		return
+	}
+
 	for _, comp := range a.comps {
 		comp.Accept(visitor)
 	}

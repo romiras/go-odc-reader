@@ -146,6 +146,11 @@ func (stm *StdTextModel) String() string {
 
 // Accept implements the visitor pattern for StdTextModel.
 func (stm *StdTextModel) Accept(visitor store.Visitor) {
+	// Check if this text model has already been visited (prevents cycles from LINK/NEWLINK)
+	if !visitor.ShouldVisit(stm) {
+		return
+	}
+
 	visitor.PartStart()
 	for _, piece := range stm.pieces {
 		piece.Accept(visitor)
