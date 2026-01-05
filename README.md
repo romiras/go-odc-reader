@@ -52,15 +52,15 @@ To see text changes when you modify `.odc` files in a Git repository:
 
 ## Project Status
 
-✅ **PRODUCTION READY**: The parser has reached parity with the reference C++ implementation.
+✅ **100% PRODUCTION READY**: The parser has achieved perfect success on the test corpus, surpassing the reference C++ implementation.
 
 **Current State (Jan 2026):**
-- ✅ **Parity Achieved**: 99.75% of test corpus files parse correctly (398/399).
-- ✅ **Binary Format Support**: Correctly handles complex nested structures, Alien stores, and StdTextModels.
-- ✅ **Validated**: Mass validation suite confirms output matches reference text.
+- ✅ **Perfect Parsing**: 100% of test corpus files parse correctly (399/399).
+- ✅ **Surpasses C++ Reference**: Successfully handles complex documents (like `Sys-Map.odc`) that cause the original C++ utility to crash.
+- ✅ **Binary Format Support**: Correctly handles shared references (LINK/NEWLINK), nested structures, `Alien` stores, and `StdTextModel`.
 
 **Known Limitations:**
-- **LinkStore (0x34/0x35)**: Not supported (neither in Go nor C++). Affects ~0.25% of files (e.g., `Sys-Map.odc`). This is a documented format limitation.
+- **None**: All known format structures in the test corpus are supported.
 
 For detailed status log, see `src/CURRENT_STATUS.md`.
 

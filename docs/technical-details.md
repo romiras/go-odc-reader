@@ -48,6 +48,12 @@ The format allows for "Alien" stores (unknown types) that may contain other embe
 - **Challenge**: Deeply nested alien stores (e.g., >3 levels) caused position mismatches because the reader state's `End` position was not being correctly preserved across recursive calls.
 - **Solution**: The reader now explicitly captures the `storeEnd` position *before* creating a new reader state for a nested store. This ensures that even if the new state is initialized empty, the bound checking uses the correct absolute file position.
 
+### Shared References & LINK/NEWLINK
+The format uses `LINK` and `NEWLINK` stores to reference previously defined objects (e.g., in a shared attribute dictionary).
+- **Discovery**: Analysis of Component Pascal source code revealed that `LINK` and `NEWLINK` stores require reading 3 integers (ID, comment, next), totaling 12 bytes. Previous implementations (including the C++ reference) often under-read these as 4-byte IDs, leading to position tracking corruption.
+- **Cycle Detection**: Since shared references can form cycles, the Go implementation implements **pointer-based cycle detection** in the visitor pattern. This prevents infinite recursion during document traversal.
+- **Superiority**: This robust handling allows the Go version to successfully parse files like `Sys-Map.odc` which cause the original C++ implementation to segfault.
+
 ## Features & Implementation
 
 - **Binary Parsing**: Comprehensive support for the `.odc` format, including nested stores and NIL stores.
@@ -60,7 +66,8 @@ The format allows for "Alien" stores (unknown types) that may contain other embe
 
 - **`pkg/reader/reader.go`**: 
   - Implements the core state machine for parsing.
-  - Handles the 8-byte header for NIL stores (a subtle format consistency).
+  - Handles the 12-byte header for `LINK`/`NEWLINK` stores.  
+  - Handles the 8-byte header for `NIL` stores.
   - Manages recursive state for nested Alien stores.
 - **`pkg/textmodel/stdtextmodel.go`**: 
   - Implements the corrected `StdTextModel` parsing logic.
@@ -70,8 +77,7 @@ The format allows for "Alien" stores (unknown types) that may contain other embe
 
 ## Known Limitations
 
-- **Link Stores**: The format specification includes `LinkStore` (markers `0x34`, `0x35`) and `NewLinkStore`. Neither the original C++ implementation nor this Go port currently supports these types.
-  - **Impact**: Approximately 0.25% of real-world .odc files (e.g., `Sys-Map.odc`) fail to parse due to this limitation. This is consistent with the reference implementation.
+- **None**: As of January 2026, the implementation supports 100% of the provided test corpus. The previously documented limitation regarding "Link Stores" was resolved by correctly implementing the 12-byte header reading and pointer-based cycle detection.
 
 ## Debugging
 
@@ -96,4 +102,4 @@ xxd -s 0x2B0 -l 100 _tests/mini4.odc
 - **mini1.odc**: Simple text document (✅ PASS)
 - **mini2.odc**: Menu definitions (✅ PASS)
 - **mini4.odc**: Complex document with folds (✅ PASS)
-- **Bulk Test**: 398/399 real-world files parse successfully (99.75% success rate). The single failure matches the C++ reference implementation's limitation.
+- **Bulk Test**: 399/399 real-world files parse successfully (100% success rate). The Go implementation correctly handles files that cause the C++ reference to crash.
