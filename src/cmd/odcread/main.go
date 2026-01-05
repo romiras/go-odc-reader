@@ -4,13 +4,11 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
-	"odcread/pkg/encoding"
+	"odcread/internal/odc"
 	"odcread/pkg/oberon"
 	"odcread/pkg/reader"
 	"odcread/pkg/store"
-	"odcread/pkg/textmodel"
 	_ "odcread/pkg/typeregister" // Import for side-effect (type registration)
 )
 
@@ -18,134 +16,6 @@ const (
 	docTag     = oberon.Integer(0x6F4F4443)
 	docVersion = oberon.Integer(0)
 )
-
-// Context interface for text accumulation
-type Context interface {
-	AddPiece(piece string)
-	GetPlainText() string
-}
-
-// PartContext - simple text accumulation
-type PartContext struct {
-	text strings.Builder
-}
-
-func (pc *PartContext) AddPiece(piece string) {
-	pc.text.WriteString(piece)
-}
-
-func (pc *PartContext) GetPlainText() string {
-	return pc.text.String()
-}
-
-// FoldContext - handles collapsed/expanded folds
-type FoldContext struct {
-	collapsed bool
-	haveFirst bool
-	firstPart strings.Builder
-	remainder strings.Builder
-}
-
-func NewFoldContext(collapsed bool) *FoldContext {
-	return &FoldContext{collapsed: collapsed}
-}
-
-func (fc *FoldContext) AddPiece(piece string) {
-	if !fc.haveFirst {
-		fc.haveFirst = true
-		fc.firstPart.WriteString(piece)
-	} else {
-		fc.remainder.WriteString(piece)
-	}
-}
-
-func (fc *FoldContext) GetPlainText() string {
-	if fc.collapsed {
-		return fmt.Sprintf("##=>%s\n%s##<=", fc.remainder.String(), fc.firstPart.String())
-	}
-	return fmt.Sprintf("##=>%s\n%s##<=", fc.firstPart.String(), fc.remainder.String())
-}
-
-// MyVisitor - concrete visitor implementation for text extraction
-type MyVisitor struct {
-	contextStack []Context
-	visited      map[store.Store]bool // Track visited stores by pointer to prevent cycles
-}
-
-func NewMyVisitor() *MyVisitor {
-	return &MyVisitor{
-		contextStack: make([]Context, 0),
-		visited:      make(map[store.Store]bool),
-	}
-}
-
-func (mv *MyVisitor) PartStart() {
-	mv.contextStack = append(mv.contextStack, &PartContext{})
-}
-
-func (mv *MyVisitor) PartEnd() {
-	mv.terminateContext()
-}
-
-func (mv *MyVisitor) FoldLeft(collapsed bool) {
-	mv.contextStack = append(mv.contextStack, NewFoldContext(collapsed))
-}
-
-func (mv *MyVisitor) FoldRight() {
-	mv.terminateContext()
-}
-
-func (mv *MyVisitor) terminateContext() {
-	if len(mv.contextStack) == 0 {
-		return
-	}
-
-	top := len(mv.contextStack) - 1
-	ctx := mv.contextStack[top]
-	mv.contextStack = mv.contextStack[:top]
-
-	if len(mv.contextStack) == 0 {
-		// Top-level context - print to stdout
-		fmt.Println(ctx.GetPlainText())
-	} else {
-		// Nested context - add to parent
-		mv.contextStack[len(mv.contextStack)-1].AddPiece(ctx.GetPlainText())
-	}
-}
-
-func (mv *MyVisitor) TextShortPiece(piece interface{}) {
-	if sp, ok := piece.(*textmodel.ShortPiece); ok {
-		str, err := encoding.ConvertLatin1(sp.GetBuffer())
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to convert short piece: %v\n", err)
-			return
-		}
-		if len(mv.contextStack) > 0 {
-			mv.contextStack[len(mv.contextStack)-1].AddPiece(str)
-		}
-	}
-}
-
-func (mv *MyVisitor) TextLongPiece(piece interface{}) {
-	if lp, ok := piece.(*textmodel.LongPiece); ok {
-		str, err := encoding.ConvertUCS2(lp.GetBuffer())
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to convert long piece: %v\n", err)
-			return
-		}
-		if len(mv.contextStack) > 0 {
-			mv.contextStack[len(mv.contextStack)-1].AddPiece(str)
-		}
-	}
-}
-
-func (mv *MyVisitor) ShouldVisit(s store.Store) bool {
-	if mv.visited[s] {
-		return false
-	}
-	mv.visited[s] = true
-	return true
-}
 
 // importDocument reads and validates an .odc document.
 func importDocument(file *os.File) (store.Store, error) {
@@ -207,6 +77,6 @@ func main() {
 	}
 
 	// Process the document with the visitor
-	visitor := NewMyVisitor()
+	visitor := odc.NewMyVisitor()
 	s.Accept(visitor)
 }
